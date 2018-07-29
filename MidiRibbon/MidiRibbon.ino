@@ -77,31 +77,6 @@ void SetProductString() {
       resetMidiUSB();       
 }
 
-
-void setup() {
-
-  // Make Arduino transparent for serial communications from and to USB
-  pinMode(0,INPUT); // Arduino RX - ATMEGA8U2 TX
-  pinMode(1,INPUT); // Arduino TX - ATMEGA8U2 RX
-
-  resetMidiUSB();
-  setVendorProductIds( 1, 1);
-  SetProductString();
-
-}
-
-void loop() {
-  // play notes from F#-0 (0x1E) to F#-5 (0x5A):
-  for (int note = 0x1E; note < 0x5A; note ++) {
-    //Note on channel 1 (0x90), some note value (note), middle velocity (0x45):
-    noteOn(0x90, note, 0x45);
-    delay(100);
-    //Note on channel 1 (0x90), some note value (note), silent velocity (0x00):
-    noteOn(0x90, note, 0x00);
-    delay(100);
-  }
-}
-
 // plays a MIDI note. Doesn't check to see that cmd is greater than 127, or that
 // data values are less than 127:
 void noteOn(int cmd, int pitch, int velocity) {
@@ -109,4 +84,92 @@ void noteOn(int cmd, int pitch, int velocity) {
   Serial.write(pitch);
   Serial.write(velocity);
 }
+
+void setup() {
+
+  // Make Arduino transparent for serial communications from and to USB
+  pinMode(0,INPUT); // Arduino RX - ATMEGA8U2 TX
+  pinMode(1,INPUT); // Arduino TX - ATMEGA8U2 RX
+  pinMode(A0, INPUT_PULLUP); // Pull up resistor for ribbon.
+
+  resetMidiUSB();
+  setVendorProductIds( 1, 1);
+  SetProductString();
+
+}
+
+const int NOTE_ON_CH0 = 0x90;
+
+const int MAXRES = 678;
+const int MINRES = 13;
+
+const int MAXNOTE1 = 83;
+const int MINNOTE1 = 60;
+
+const int MAXNOTE2 = 90;
+const int MINNOTE2 = 67;
+
+const int MAXNOTE3 = 97;
+const int MAXNOTE3 = 74;
+
+int transpose = 0;
+
+bool playing = false;
+int current_note = 0;
+
+int getCurrentNote( int ribbonNumber, int aVal ) {
+  int maxNote = 0;
+  int minNote = 0;
+  switch( ribbonNumber )
+  {
+    case 1:
+      maxNote = MAXNOTE1;
+      minNote = MINNOTE1;
+      break;
+    case 2:
+      maxNote = MAXNOTE2;
+      minNote = MINNOTE2;
+      break;
+    case 3:
+      maxNote = MAXNOTE3;
+      minNote = MINNOTE3;
+      break;
+    default:
+      return 0;      
+  }
+  return map( aVal, MINRES, MAXRES, minNote + transpose, maxNote + transpose );
+}
+
+
+void loop() {
+
+
+  int pot1_in = analogRead(A0);
+
+  if ( po1t_in > 800 ) {
+    // The string in not being pressed so stop a note if it is playing
+    if ( playing ) {
+      noteOn( NOTE_ON_CH0, current_note, 0x00 );
+        playing = false;
+    }
+  } else {
+    int new_note = getCurrentNote( pot1_in );
+    // A note is pressed. If one is playing, stop it unless it is the same note
+    if ( current_note != new_note ) {
+
+      if ( playing ) {
+        noteOn( NOTE_ON_CH0, current_note, 0x00 );
+      }
+      current_note = new_note;
+      playing = true;
+      noteOn( NOTE_ON_CH0, current_note, 0x45 );
+    }
+  }
+
+
+  delay(1);
+
+
+}
+
 
